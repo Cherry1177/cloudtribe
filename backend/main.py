@@ -306,3 +306,30 @@ def handle_message(event):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8001, reload=True)
+
+@app.post("/callback")
+async def callback(request: Request):
+    signature = request.headers.get('X-Line-Signature')
+    body = (await request.body()).decode('utf-8')
+
+    logger.info("✅ Callback triggered!")
+    logger.info(f"Signature: {signature}")
+    logger.info(f"Body: {body}")
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        logger.error("Invalid signature. Please check your channel access token/channel secret.")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        logger.exception("Unhandled exception occurred during webhook handling")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    return 'OK'
+@app.get("/")           
+async def root():
+    """
+    Root endpoint to check if the server is running.
+
+    Returns:
+    - dict: A message indicating that the server is running.
+    """
+    return {"message": "Server is running"}
