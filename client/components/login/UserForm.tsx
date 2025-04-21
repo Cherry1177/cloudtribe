@@ -60,6 +60,7 @@ export function UserForm() {
 
   const handleAddLineBot = () => {
     window.open('https://page.line.me/261lgfkv', '_blank');
+    // window.open('https://www.cloudtribe.site/callback', '_blank');
   };
 
   return (
