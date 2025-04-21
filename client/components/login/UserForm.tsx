@@ -59,7 +59,7 @@ export function UserForm() {
   };
 
   const handleAddLineBot = () => {
-    window.open('https://line.me/R/ti/p/%40211mdhui', '_blank');
+    window.open('https://page.line.me/261lgfkv', '_blank');
   };
 
   return (
