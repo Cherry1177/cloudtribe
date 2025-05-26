@@ -80,6 +80,12 @@ const DriverAvailableTimes: React.FC<{ driverId: number }> = ({ driverId }) => {
     }
   }, [isLoaded]);
 
+  useEffect(() => {
+      if (openSheet) {
+        fetchTimeSlots();
+      }
+    }, [date]);
+
   // Fetch predictions when search term changes
   useEffect(() => {
     if (isManualInput && debouncedSearchTerm && autocompleteService.current) {
@@ -144,11 +150,18 @@ const DriverAvailableTimes: React.FC<{ driverId: number }> = ({ driverId }) => {
     try {
       const response = await fetch(`/api/drivers/${driverId}/times`);
       const data = await response.json();
-      setTimeSlots(data);
-    } catch (error) {
-      console.error('Error fetching driver times:', error);
-    }
-  };
+      if (Array.isArray(data)) {
+          setTimeSlots(data);
+        } else {
+          console.warn("Unexpected data:", data);
+          setTimeSlots([]); // fallback
+        }
+      console.log("Fetched timeSlots:", data);
+        } catch (error) {
+          console.error('Error fetching driver times:', error);
+        }
+      };
+  
 
   const handleSheetOpen = () => {
     setOpenSheet(true); 
@@ -160,11 +173,18 @@ const DriverAvailableTimes: React.FC<{ driverId: number }> = ({ driverId }) => {
     setError(null);
     //如果有個司機可用時間是今天的日期，那還可以有一個今天以後的日期
     //不可以有兩個今天以後的日期
-    if(timeSlots.filter(timeSlot => timeSlot.date > new Date().toLocaleDateString('zh-TW', 
-      {timeZone: 'Asia/Taipei'}).replace(/\//g,'-')).length > 0) {
-        setError("請等最近一次運送結束後再進行設定");
-        return;
+    // if(timeSlots.filter(timeSlot => timeSlot.date > new Date().toLocaleDateString('zh-TW', 
+    //   {timeZone: 'Asia/Taipei'}).replace(/\//g,'-')).length > 0) {
+    //     setError("請等最近一次運送結束後再進行設定");
+    //     return;
+    // }
+    if (Array.isArray(timeSlots) && timeSlots.filter(timeSlot =>
+      timeSlot.date > new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replace(/\//g, '-')
+    ).length > 0) {
+      setError("請等最近一次運送結束後再進行設定");
+      return;
     }
+
     if (!date) {
       setError("請選擇日期。");
       return;
@@ -284,9 +304,33 @@ const DriverAvailableTimes: React.FC<{ driverId: number }> = ({ driverId }) => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                 >
                   <option value="">選擇開始時間</option>
-                  {timeOptions.map((time) => (
+                  {/* {timeOptions.map((time) => (
                     <option key={time} value={time}>{time}</option>
-                  ))}
+                  ))} */}
+                  {timeOptions.map((time) => {
+                  // const formattedSelectedDate = date?.toISOString().split("T")[0]; // gives 'YYYY-MM-DD'
+                  const formattedSelectedDate = date
+                    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                    : '';
+                  const isTimeTaken = Array.isArray(timeSlots) && timeSlots.some(slot => {
+                     //from chatGPT
+                    if (!slot.date || !slot.start_time) return false;
+                      const dateObj = new Date(slot.date);
+                      if (isNaN(dateObj.getTime())) return false; // invalid date
+                    // const slotDate = slot.date?.split("T")[0]; // Normalize to 'YYYY-MM-DD'
+                   
+                    const slotDate = new Date(slot.date).toISOString().split("T")[0];
+                    const slotTime = slot.start_time?.slice(0, 5); // Take only 'HH:MM'
+                    return slotDate === formattedSelectedDate && slotTime === time;
+                  });
+
+                  return (
+                    <option key={time} value={time} disabled={isTimeTaken}>
+                      {time} {isTimeTaken ? "(已被預約)" : ""}
+                    </option>
+                  );
+                })}
+
                 </select>
               </div>
             </div>
@@ -338,7 +382,7 @@ const DriverAvailableTimes: React.FC<{ driverId: number }> = ({ driverId }) => {
               className="mt-5 px-6 py-3 text-lg font-bold border-2 border-black text-black bg-white hover:bg-blue-500 hover:text-white" 
               onClick={handleAddTimeSlot}
             >
-              新增時間
+              新增時間 Get
             </Button>
           </div>
 
@@ -346,8 +390,10 @@ const DriverAvailableTimes: React.FC<{ driverId: number }> = ({ driverId }) => {
               <h3 className="text-lg font-semibold">目前可用的時間(一次只能新增一個時間段)</h3>
               {timeSlots.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
-                  {timeSlots.filter(timeSlot => timeSlot.date >= new Date().toLocaleDateString('zh-TW', 
-                  {timeZone: 'Asia/Taipei'}).replace(/\//g,'-')).map(slot => (
+                  {/* @ToDO */}
+                  {/* {timeSlots.filter(timeSlot => timeSlot.date >= new Date().toLocaleDateString('zh-TW',  */}
+                  {/* {timeZone: 'Asia/Taipei'}).replace(/\//g,'-')).map(slot => ( */}
+                  {timeSlots.map(slot => (
                     <TimeCard
                       key={slot.id}
                       timeSlot={slot}

@@ -94,7 +94,8 @@ CREATE TABLE agricultural_produce (
     img_link VARCHAR(255) NOT NULL,
     img_id VARCHAR(36) NOT NULL,
     seller_id INTEGER NOT NULL,
-    unit VARCHAR(10) NOT NULL
+    unit VARCHAR(10) NOT NULL,
+    location VARCHAR(100) NOT NULL DEFAULT 'unknown'
 );
 
 CREATE TABLE agricultural_shopping_cart (

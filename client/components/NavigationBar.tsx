@@ -29,6 +29,7 @@ interface authProps {
  * @returns JSX.Element - The AuthComponent rendering the login/logout button and settings link.
  */
 const AuthComponent: React.FC<authProps> = (prop) => {
+  console.log("AuthComponent: ", prop.userInfo);
   return (
     <div className='flex flex-row items-center'>
       {/* If the user is not logged in, show the login link */}

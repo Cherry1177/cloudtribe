@@ -318,8 +318,7 @@ const DriverPage: React.FC = () => {
                         {isClient && user?.is_driver && (
                             <div className="flex flex-col items-center">
                                 <DriverAvailableTimes driverId={driverData?.id || 0} />
-
-                                
+                             
                                 <Button 
                                     className="mb-10 px-6 py-3 text-lg font-bold border-2 border-black text-black bg-white hover:bg-blue-500 hover:text-white"
                                     onClick={() => {
