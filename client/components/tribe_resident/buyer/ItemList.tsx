@@ -82,7 +82,7 @@ const ItemList: React.FC<ItemListProps> = ({ products, itemsPerPage, addToCart }
               src={
                 product.category === "小木屋鬆餅" || product.category === "金鰭" || product.category === "原丼力"
                   ? `/test/${encodeURIComponent(product.img)}` // Local image from the public folder
-                  : `https://www.cloudtribe.online${product.img}` // Online image URL
+                  : `https://www.cloudtribe.site${product.img}` // Online image URL
               }
               alt={product.name}
               width={250}

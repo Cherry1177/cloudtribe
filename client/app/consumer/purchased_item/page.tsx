@@ -25,6 +25,7 @@ export default function Page(){
   const get_purchased_items = async(user: User) => {
     try {
       const res = await ConsumerService.get_purchased_items(user.id)
+      console.log('res:', res)
       setPurchasedItems(res) 
     }
     catch(e){
