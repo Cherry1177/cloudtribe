@@ -39,15 +39,21 @@ from .handlers.send_message import LineMessageService
 from backend.database import get_db_connection
 
 
-
+from pathlib import Path
+from dotenv import load_dotenv
+import os
 # environment variables
-load_dotenv()
+load_dotenv(dotenv_path="backend/.env")
+print("正在使用的 DATABASE_URL：", os.getenv("DATABASE_URL"))
 
 line_bot_token = os.getenv('LINE_BOT_TOKEN')
 line_bot_secret = os.getenv('LINE_BOT_SECRET')
 
 
 app = FastAPI()
+
+from backend.routers import email_otp
+app.include_router(email_otp.router, prefix="/api/otp", tags=["OTP 驗證"])
 
 # Register routers
 app.include_router(orders.router, prefix="/api/orders", tags=["orders"])
@@ -76,31 +82,7 @@ line_message_service = LineMessageService()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@app.post("/callback")
-async def callback(request: Request):
-    """
-    Handle the Line Bot callback request.
 
-    Parameters:
-    - request (Request): The HTTP request object.
-
-    Returns:
-    - str: The response message.
-    """
-    signature = request.headers['X-Line-Signature']
-
-    body = (await request.body()).decode('utf-8')
-    logger.info("Request body: %s", body)
-    try:
-        handler.handle(body, signature)
-    except InvalidSignatureError:
-        logger.error("Invalid signature")
-        raise HTTPException(status_code=400, detail="Invalid signature")
-    except Exception as e:
-        logger.exception("Unhandled exception occurred during webhook handling")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-
-    return 'OK'
 
 def handle_invalid_signature_error():
     """
@@ -124,6 +106,10 @@ def handle_message(event):
     Returns:
     - None
     """
+    if event.delivery_context and event.delivery_context.is_redelivery:
+        logger.warning(" Skipped redelivery event to avoid invalid reply_token")
+        return
+
     user_message = event.message.text
     line_user_id = event.source.user_id
     logger.info("Message from LINE user: %s, content: %s", line_user_id, user_message)
@@ -137,7 +123,7 @@ def handle_message(event):
                 cur = conn.cursor()
                 cur.execute("SELECT id FROM users WHERE line_user_id = %s", (line_user_id,))
                 existing_binding = cur.fetchone()
-                
+
                 if existing_binding:
                     line_bot_api.reply_message(
                         ReplyMessageRequest(
@@ -146,7 +132,7 @@ def handle_message(event):
                         )
                     )
                     return
-                
+
             user_states[line_user_id] = "waiting_for_name"
             line_bot_api.reply_message(
                 ReplyMessageRequest(
@@ -159,10 +145,10 @@ def handle_message(event):
             return
 
         if user_message.lower() == "取消":
-            if line_user_id in user_states:
-                del user_states[line_user_id]
-            if f"{line_user_id}_name" in user_states:
-                del user_states[f"{line_user_id}_name"]
+            # Cancel registration process
+            keys_to_remove = [k for k in user_states if k.startswith(line_user_id)]
+            for k in keys_to_remove:
+                del user_states[k]
             line_bot_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -174,37 +160,29 @@ def handle_message(event):
         # Deal with name input
         if user_states.get(line_user_id) == "waiting_for_name":
             name = user_message.strip()
-            # Check if name is valid
             if not re.match(r'^[\u4e00-\u9fa5A-Za-z]+$', name):
                 line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[
-                            TextMessage(text="姓名格式不正確。\n- 只能包含中文和英文字母\n- 請重新輸入姓名\n- 若要取消註冊，請輸入「取消」")
-                        ]
+                        messages=[TextMessage(text="姓名格式不正確。\n- 只能包含中文和英文字母\n- 請重新輸入姓名\n- 若要取消註冊，請輸入「取消」")]
                     )
                 )
                 return
-            
-            # Save name and prompt for phone number
+
             user_states[f"{line_user_id}_name"] = name
             user_states[line_user_id] = "waiting_for_phone"
             line_bot_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[
-                        TextMessage(text=f"已記錄姓名：{name}\n請輸入您的電話號碼\n- 若要重新輸入姓名，請輸入「重新輸入」\n- 若要取消註冊，請輸入「取消」")
-                    ]
+                    messages=[TextMessage(text=f"已記錄姓名：{name}\n請輸入您的電話號碼\n- 若要重新輸入姓名，請輸入「重新輸入」\n- 若要取消註冊，請輸入「取消」")]
                 )
             )
             return
 
         if user_message == "重新輸入":
             if user_states.get(line_user_id) == "waiting_for_phone":
-                # Back to waiting for name
                 user_states[line_user_id] = "waiting_for_name"
-                if f"{line_user_id}_name" in user_states:
-                    del user_states[f"{line_user_id}_name"]
+                del user_states[f"{line_user_id}_name"]
                 line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -212,85 +190,76 @@ def handle_message(event):
                     )
                 )
                 return
-            elif user_states.get(line_user_id) == "waiting_for_name":
+
+        # Deal with phone number input
+        if user_states.get(line_user_id) == "waiting_for_phone":
+            phone = user_message.strip()
+            name = user_states.get(f"{line_user_id}_name")
+            if not phone.isdigit() or not (7 <= len(phone) <= 10):
                 line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[TextMessage(text="請輸入您的姓名")]
+                        messages=[TextMessage(text="電話號碼格式不正確。\n- 需要是7-10位數字\n- 請重新輸入電話號碼\n- 若要重新輸入姓名，請輸入「重新輸入」\n- 若要取消註冊，請輸入「取消」")]
                     )
                 )
                 return
 
-        # Deal with phone number input
-        if user_states.get(line_user_id) == "waiting_for_phone":
-            try:
-                phone = user_message.strip()
-                name = user_states.get(f"{line_user_id}_name")
-                
-                if not phone.isdigit() or not (7 <= len(phone) <= 10):
-                    line_bot_api.reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[
-                                TextMessage(text="電話號碼格式不正確。\n- 需要是7-10位數字\n- 請重新輸入電話號碼\n- 若要重新輸入姓名，請輸入「重新輸入」\n- 若要取消註冊，請輸入「取消」")
-                            ]
-                        )
-                    )
-                    return
+            user_states[f"{line_user_id}_phone"] = phone
+            user_states[line_user_id] = "waiting_for_email"
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="請輸入您的 Email，以寄送驗證碼")]
+                )
+            )
+            return
 
-                # Check if phone number is already registered
+        # Deal with email input
+        if user_states.get(line_user_id) == "waiting_for_email":
+            email = user_message.strip()
+            user_states[f"{line_user_id}_email"] = email
+            from backend.routers.email_otp import send_otp
+            send_otp(email=email)
+            user_states[line_user_id] = "waiting_for_email_otp"
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="已寄出驗證碼，請輸入 6 碼驗證碼")]
+                )
+            )
+            return
+
+        # Verify email OTP
+        if user_states.get(line_user_id) == "waiting_for_email_otp":
+            code = user_message.strip()
+            from backend.routers.email_otp import otp_store
+            email = user_states.get(f"{line_user_id}_email")
+            phone = user_states.get(f"{line_user_id}_phone")
+            name = user_states.get(f"{line_user_id}_name")
+            if otp_store.get(email) == code:
                 with get_db_connection() as conn:
                     cur = conn.cursor()
-                    cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
-                    existing_user = cur.fetchone()
-                    
-                    if existing_user:
-                        line_bot_api.reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[
-                                    TextMessage(text="此電話號碼已被註冊。\n- 請使用其他號碼\n- 若要重新輸入姓名，請輸入「重新輸入」\n- 若要取消註冊，請輸入「取消」")
-                                ]
-                            )
-                        )
-                        return
-                    
-                    # Create new user
                     cur.execute(
-                        "INSERT INTO users (name, phone, location, is_driver, line_user_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                        (name, phone, '未選擇', False, line_user_id)
+                        "INSERT INTO users (name, phone, location, is_driver, line_user_id, email) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (name, phone, '未選擇', False, line_user_id, email)
                     )
                     conn.commit()
-                    
-                    line_bot_api.reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[
-                                TextMessage(text=f"註冊成功！\n姓名：{name}\n電話：{phone}\n\n")
-                            ]
-                        )
-                    )
-                
-                # Clear user states
-                del user_states[line_user_id]
-                del user_states[f"{line_user_id}_name"]
-                
-            except Exception as e:
-                logger.error("Error during registration: %s", str(e))
+                for key in list(user_states.keys()):
+                    if line_user_id in key:
+                        del user_states[key]
                 line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[
-                            TextMessage(text="註冊過程發生錯誤，請稍後再試\n- 若要重新開始註冊，請輸入「註冊」\n- 若需要協助，請輸入「客服」")
-                        ]
+                        messages=[TextMessage(text="驗證成功，已完成註冊")]
                     )
                 )
-                
-                # Clear user states
-                if line_user_id in user_states:
-                    del user_states[line_user_id]
-                if f"{line_user_id}_name" in user_states:
-                    del user_states[f"{line_user_id}_name"]
+            else:
+                line_bot_api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="驗證碼錯誤，請重新輸入")]
+                    )
+                )
             return
 
         elif user_message in ["客服", "詢問客服", "詢問"]:
@@ -303,6 +272,7 @@ def handle_message(event):
                 )
             )
 
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8001, reload=True)
@@ -312,7 +282,7 @@ async def callback(request: Request):
     signature = request.headers.get('X-Line-Signature')
     body = (await request.body()).decode('utf-8')
 
-    logger.info("✅ Callback triggered!")
+    logger.info("Callback triggered!")
     logger.info(f"Signature: {signature}")
     logger.info(f"Body: {body}")
     try:

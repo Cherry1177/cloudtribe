@@ -59,7 +59,8 @@ export function UserForm() {
   };
 
   const handleAddLineBot = () => {
-    window.open('https://page.line.me/261lgfkv', '_blank');
+    //window.open('https://page.line.me/261lgfkv', '_blank');
+    window.open('https://page.line.me/240cyafu', '_blank');
     // window.open('https://www.cloudtribe.site/callback', '_blank');
   };
 
@@ -67,7 +68,7 @@ export function UserForm() {
     <div className="flex flex-col items-center space-y-4">
       <Button 
         onClick={handleAddLineBot}
-        className="w-full max-w-[400px] bg-[#00B900] hover:bg-[#009900] text-white flex items-center justify-center space-x-2"
+        className="w-full max-w-[400px] bg-[#0044BB] hover:bg-[#33CCFF] text-white flex items-center justify-center space-x-2"
       >
         <span>首次註冊</span>
       </Button>

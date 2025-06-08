@@ -2,8 +2,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
-load_dotenv()
-
+load_dotenv(dotenv_path="backend/.env")
 
 # Fetch the DATABASE_URL from environment variables
 database_url = os.environ.get('DATABASE_URL')

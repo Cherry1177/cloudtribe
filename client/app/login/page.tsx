@@ -4,13 +4,12 @@ import  React from 'react';
 import { NavigationBar } from "@/components/NavigationBar";
 import { UserForm } from '@/components/login/UserForm';
 
-
 const LoginPage: React.FC = () => {
   return (
     <div
       className="flex flex-col h-screen items-center"
       style={{
-        backgroundImage: "url('/mountain.jpg')",
+        backgroundImage: "url('/login.png')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
