@@ -127,7 +127,7 @@ const OrderCard: React.FC<{
         } else if (item.img?.includes('imgur.com')) {
             return item.img; // Imgur image - direct URL
         } else {
-            return `https://www.cloudtribe.online${item.img}`; // CloudTribe image
+            return `https://www.cloudtribe.site${item.img}`; // CloudTribe image
         }
     };
 

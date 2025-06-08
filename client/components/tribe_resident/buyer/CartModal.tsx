@@ -61,7 +61,7 @@ const CartModal: React.FC<CartModalProps> = ({ cart, onClose, removeFromCart, up
                   src={
                         item.category === "小木屋鬆餅" || item.category === "金鰭" || item.category === "原丼力"
                         ? `/test/${encodeURIComponent(item.img)}` // Local image from the public folder
-                        : `https://www.cloudtribe.online${item.img}` // Online image URL
+                        : `https://www.cloudtribe.site${item.img}` // Online image URL
                       }
                   alt={item.name} 
                   width={64} 

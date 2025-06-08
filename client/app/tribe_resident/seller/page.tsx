@@ -33,6 +33,7 @@ export default function Page(){
   const get_products = async(user:User) => {
     if(user != undefined){
       const res_products = await SellerService.get_upload_product(user.id)
+      console.log('Get products: ', res_products)
       var _products: BasicProductInfo[] = res_products
       setProducts(_products)
     }    

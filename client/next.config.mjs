@@ -37,12 +37,12 @@ export default async (phase) => {
         },
         {
           protocol: "https",
-          hostname: "www.cloudtribe.online",
+          hostname: "www.cloudtrib.site",
           port: "",
           pathname: "/**",
         },
       ],
-      domains: ["www.cloudtribe.online", "cloudtribe.online"],
+      domains: ["www.cloudtribe.site", "cloudtribe.site"],
     },
 
     // S
@@ -68,7 +68,7 @@ export default async (phase) => {
           source: "/api/:path*",
           destination: isDev
             ? "http://localhost:8000/api/:path*"
-            : "https://www.cloudtribe.online/api/:path*",
+            : "https://www.cloudtribe.site/api/:path*",
         },
       ];
     },
